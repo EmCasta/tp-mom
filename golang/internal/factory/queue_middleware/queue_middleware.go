@@ -32,19 +32,10 @@ func (qm *QueueMiddleware) StartConsuming(callbackFunc func(msg middleware.Messa
 		nil,           // args
 	)
 	if err != nil {
-		return middleware.ErrMessageMiddlewareDisconnected // revisar !!!
+		return utils.HandleConnectionError(err, qm.connection, qm.channel)
 	}
 	for m := range msgs {
-		body := string(m.Body)
-		message := middleware.Message{Body: body}
-		// TODO: errores??
-		ack := func() {
-			m.Ack(false)
-		}
-		nack := func() {
-			m.Nack(false, false)
-		}
-		callbackFunc(message, ack, nack)
+		utils.HandleIncomingMessage(m, callbackFunc)
 	}
 	return nil
 }
@@ -54,19 +45,15 @@ func (qm *QueueMiddleware) StopConsuming() error {
 }
 
 func (qm *QueueMiddleware) Send(msg middleware.Message) error {
-	// TODO: error interno??
 	err := qm.channel.Publish(
 		"",
 		qm.queue.Name,
 		false,
 		false,
-		amqp.Publishing{
-			ContentType: "text/plain",
-			Body:        []byte(msg.Body),
-		},
+		utils.CreateMessage(msg.Body),
 	)
 	if err != nil {
-		return middleware.ErrMessageMiddlewareDisconnected
+		return utils.HandleConnectionError(err, qm.connection, qm.channel)
 	}
 	return nil
 }

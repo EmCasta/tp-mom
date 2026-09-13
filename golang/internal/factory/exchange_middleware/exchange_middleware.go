@@ -32,7 +32,7 @@ func (em *ExchangeMiddleware) StartConsuming(callbackFunc func(msg middleware.Me
 		nil,   // arguments
 	)
 	if err != nil {
-		return middleware.ErrMessageMiddlewareMessage
+		return utils.HandleConnectionError(err, em.connection, em.channel)
 	}
 	for _, k := range em.keys {
 		err = em.channel.QueueBind(
@@ -43,10 +43,9 @@ func (em *ExchangeMiddleware) StartConsuming(callbackFunc func(msg middleware.Me
 			nil,
 		)
 		if err != nil {
-			return middleware.ErrMessageMiddlewareMessage
+			return utils.HandleConnectionError(err, em.connection, em.channel)
 		}
 	}
-
 	msgs, err := em.channel.Consume(
 		q.Name,      // queue
 		em.consumer, // consumer
@@ -57,18 +56,10 @@ func (em *ExchangeMiddleware) StartConsuming(callbackFunc func(msg middleware.Me
 		nil,         // args
 	)
 	if err != nil {
-		return middleware.ErrMessageMiddlewareDisconnected
+		return utils.HandleConnectionError(err, em.connection, em.channel)
 	}
 	for m := range msgs {
-		body := string(m.Body)
-		message := middleware.Message{Body: body}
-		ack := func() {
-			m.Ack(false)
-		}
-		nack := func() {
-			m.Nack(false, false)
-		}
-		callbackFunc(message, ack, nack)
+		utils.HandleIncomingMessage(m, callbackFunc)
 	}
 	return nil
 }
@@ -84,12 +75,9 @@ func (em *ExchangeMiddleware) Send(msg middleware.Message) error {
 			k,
 			false,
 			false,
-			amqp.Publishing{
-				ContentType: "text/plain",
-				Body:        []byte(msg.Body),
-			},
+			utils.CreateMessage(msg.Body),
 		); err != nil {
-			return middleware.ErrMessageMiddlewareDisconnected
+			return utils.HandleConnectionError(err, em.connection, em.channel)
 		}
 	}
 	return nil
