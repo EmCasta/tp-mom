@@ -58,5 +58,5 @@ func CreateExchangeMiddleware(exchange string, keys []string, connectionSettings
 		return nil, err
 	}
 
-	return exchange_middleware.NewExchangeMiddleware(conn, ch, keys), nil
+	return exchange_middleware.NewExchangeMiddleware(conn, ch, exchange, keys), nil
 }
