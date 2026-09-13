@@ -1,8 +1,13 @@
 package exchange_middleware
 
 import (
+	"github.com/7574-sistemas-distribuidos/tp-mom/golang/internal/factory/utils"
 	"github.com/7574-sistemas-distribuidos/tp-mom/golang/internal/middleware"
 	amqp "github.com/rabbitmq/amqp091-go"
+)
+
+const (
+	EXCHANGE_CONSUMER_TAG string = "exchange-consumer"
 )
 
 type ExchangeMiddleware struct {
@@ -10,10 +15,11 @@ type ExchangeMiddleware struct {
 	channel    *amqp.Channel
 	name       string
 	keys       []string
+	consumer   string
 }
 
 func NewExchangeMiddleware(conn *amqp.Connection, ch *amqp.Channel, name string, keys []string) *ExchangeMiddleware {
-	return &ExchangeMiddleware{connection: conn, channel: ch, name: name, keys: keys}
+	return &ExchangeMiddleware{connection: conn, channel: ch, name: name, keys: keys, consumer: EXCHANGE_CONSUMER_TAG}
 }
 
 func (em *ExchangeMiddleware) StartConsuming(callbackFunc func(msg middleware.Message, ack func(), nack func())) error {
@@ -42,13 +48,13 @@ func (em *ExchangeMiddleware) StartConsuming(callbackFunc func(msg middleware.Me
 	}
 
 	msgs, err := em.channel.Consume(
-		q.Name,     // queue
-		"consumer", // consumer
-		false,      // auto ack
-		false,      // exclusive
-		false,      // no local
-		false,      // no wait
-		nil,        // args
+		q.Name,      // queue
+		em.consumer, // consumer
+		false,       // auto ack
+		false,       // exclusive
+		false,       // no local
+		false,       // no wait
+		nil,         // args
 	)
 	if err != nil {
 		return middleware.ErrMessageMiddlewareDisconnected
@@ -68,11 +74,7 @@ func (em *ExchangeMiddleware) StartConsuming(callbackFunc func(msg middleware.Me
 }
 
 func (em *ExchangeMiddleware) StopConsuming() error {
-	err := em.channel.Cancel("consumer", false)
-	if err != nil {
-		return middleware.ErrMessageMiddlewareDisconnected
-	}
-	return nil
+	return utils.CancelConsumption(em.channel, em.consumer)
 }
 
 func (em *ExchangeMiddleware) Send(msg middleware.Message) error {
@@ -94,11 +96,5 @@ func (em *ExchangeMiddleware) Send(msg middleware.Message) error {
 }
 
 func (em *ExchangeMiddleware) Close() error {
-	if err := em.channel.Close(); err != nil {
-		return middleware.ErrMessageMiddlewareClose
-	}
-	if err := em.connection.Close(); err != nil {
-		return middleware.ErrMessageMiddlewareClose
-	}
-	return nil
+	return utils.CloseConnection(em.connection, em.channel)
 }

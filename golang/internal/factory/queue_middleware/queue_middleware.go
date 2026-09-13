@@ -1,24 +1,30 @@
 package queue_middleware
 
 import (
+	"github.com/7574-sistemas-distribuidos/tp-mom/golang/internal/factory/utils"
 	"github.com/7574-sistemas-distribuidos/tp-mom/golang/internal/middleware"
 	amqp "github.com/rabbitmq/amqp091-go"
+)
+
+const (
+	QUEUE_CONSUMER_TAG string = "queue-consumer"
 )
 
 type QueueMiddleware struct {
 	connection *amqp.Connection
 	channel    *amqp.Channel
 	queue      amqp.Queue
+	consumer   string
 }
 
 func NewQueueMiddleware(conn *amqp.Connection, ch *amqp.Channel, q amqp.Queue) *QueueMiddleware {
-	return &QueueMiddleware{connection: conn, channel: ch, queue: q}
+	return &QueueMiddleware{connection: conn, channel: ch, queue: q, consumer: QUEUE_CONSUMER_TAG}
 }
 
 func (qm *QueueMiddleware) StartConsuming(callbackFunc func(msg middleware.Message, ack func(), nack func())) error {
 	msgs, err := qm.channel.Consume(
 		qm.queue.Name, // queue
-		"consumer",    // consumer
+		qm.consumer,   // consumer
 		false,         // auto-ack
 		false,         // exclusive
 		false,         // no-local
@@ -44,11 +50,7 @@ func (qm *QueueMiddleware) StartConsuming(callbackFunc func(msg middleware.Messa
 }
 
 func (qm *QueueMiddleware) StopConsuming() error {
-	err := qm.channel.Cancel("consumer", false)
-	if err != nil {
-		return middleware.ErrMessageMiddlewareDisconnected
-	}
-	return nil
+	return utils.CancelConsumption(qm.channel, qm.consumer)
 }
 
 func (qm *QueueMiddleware) Send(msg middleware.Message) error {
@@ -70,11 +72,5 @@ func (qm *QueueMiddleware) Send(msg middleware.Message) error {
 }
 
 func (qm *QueueMiddleware) Close() error {
-	if err := qm.channel.Close(); err != nil {
-		return middleware.ErrMessageMiddlewareClose
-	}
-	if err := qm.connection.Close(); err != nil {
-		return middleware.ErrMessageMiddlewareClose
-	}
-	return nil
+	return utils.CloseConnection(qm.connection, qm.channel)
 }
