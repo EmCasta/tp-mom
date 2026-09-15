@@ -25,7 +25,7 @@ func NewExchangeMiddleware(conn *amqp.Connection, ch *amqp.Channel, name string,
 func (em *ExchangeMiddleware) StartConsuming(callbackFunc func(msg middleware.Message, ack func(), nack func())) error {
 	q, err := em.channel.QueueDeclare(
 		"",    // name
-		false, // durability
+		true,  // durability
 		false, // delete when unused
 		false, // exclusive
 		false, // no-wait
@@ -39,7 +39,7 @@ func (em *ExchangeMiddleware) StartConsuming(callbackFunc func(msg middleware.Me
 			q.Name,  // queue name
 			k,       // routing key
 			em.name, // exchange
-			false,
+			false,   // no-wait
 			nil,
 		)
 		if err != nil {

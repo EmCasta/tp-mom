@@ -31,12 +31,15 @@ func (qm *QueueMiddleware) StartConsuming(callbackFunc func(msg middleware.Messa
 		false,         // no-wait
 		nil,           // args
 	)
+	// TODO: agregar QoS?
 	if err != nil {
 		return utils.HandleConnectionError(err, qm.connection, qm.channel)
 	}
+	// leer mensajes entrantes
 	for m := range msgs {
 		utils.HandleIncomingMessage(m, callbackFunc)
 	}
+	// TODO: y caso de error?
 	return nil
 }
 
